@@ -1,13 +1,10 @@
-<<<<<<< HEAD
-=======
 # liner mapping
->>>>>>> 9b67daa972b300d0c89aeedecff167b1e9bdef46
 Javascript for learning liner mapping
 This is a HTML with some script for learning liner mapping.
 The liner algebra is for resoving linear simultaneous equations
 and for liner mapping of vector space.
-<<<<<<< HEAD
 
+# usage
 Two canvases apear on your browser when this HTML file is loaded.
 You can plot dots, lines, rectangles on the left canvas, then 
 images mapped by the marix are drawn on the right canvas.
@@ -32,5 +29,4 @@ Then Y' is converted to the orthogonal coordinate value. The unchecking means th
 Therefore we have confirmed AX=P*D*P^-1*X.
 
 MIT license applies to this javascript. All right reserved by Hiroaki Hata.
-=======
->>>>>>> 9b67daa972b300d0c89aeedecff167b1e9bdef46
+
