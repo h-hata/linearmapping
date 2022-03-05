@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Linear Mapping</title>
+</head>
+<style>
+  .txt {
+    display: inline-block;
+    width: 80px;
+    border: 1px solid #999;
+    box-sizing: border-box;
+    background: #f2f2f2be;
+    margin: 0.5em 0;
+  }
+
+  .canvas_orig {
+    top: 0px;
+    right: 0;
+    bottom: 0;
+    left: 20px;
+    position: absolute;
+  }
+
+  .canvas_mapped {
+    top: 0px;
+    right: 0;
+    bottom: 0;
+    left: 430px;
+    position: absolute;
+  }
+</style>
+
+<body>
+  <h1>Matrix</h1>
+  <label>A11：<input type="text" class="txt" id="A11" value=2></label>
+  <label>A11：<input type="text" class="txt" id="A12" value=-1></label><br>
+  <label>A21：<input type="text" class="txt" id="A21" value=-1></label>
+  <label>A22：<input type="text" class="txt" id="A22" value=2></label>
+  <input type="checkbox" id="eigen" name="eigen"><label for="eigen">Eigen Values</label>
+  <span id="memo" margin="10px" height="1.5em" font-size="12px"></span>
+  <hr>
+  <div id="canvas-area" width="100%" style="height: 80vh; position: relative; overflow: hidden;"
+    class="canvas-wrapper text-center">
+    <canvas id="orig-temp" width="400px" height="400px" class="canvas_orig"></canvas>
+    <canvas id="orig-axis" width="400px" height="400px" class="canvas_orig"></canvas>
+    <canvas id="orig-image" width="400px" height="400px" class="canvas_orig"></canvas>
+    <canvas id="mapped-temp" width="400px" height="400px" class="canvas_mapped"></canvas>
+    <canvas id="mapped-image" width="400px" height="400px" class="canvas_mapped"></canvas>
+    <canvas id="mapped-axis" width="400px" height="400px" class="canvas_mapped"></canvas>
+  </div>
+  <div style="top: 560px; left: 20px; position: absolute;">
+    <p id="output" margin="10px" height="1.5em" font-size="12px"></p>
+  </div>
+  <div style="top: 560px; left: 430px; position: absolute;">
+    <p id="output2" margin="10px" height="1.5em" font-size="12px"></p>
+  </div>
+
+  <div style="top: 600px; left: 20px; position: absolute;">
+    <button id="clear-button">Clear All</button>
+    <button id="undo">Undo</button>
+    <label><input type="color" id="pencolor">Color</label><br>
+    <label><input type="radio" name="pentype" value="3" checked>Dot</label>
+    <label><input type="radio" name="pentype" value="0">Pen</label>
+    <label><input type="radio" name="pentype" value="4">Line from Origin</label>
+    <label><input type="radio" name="pentype" value="1">Line</label>
+    <label><input type="radio" name="pentype" value="2">Rectangle</label>
+  </div>
+
+  <!--=================================SCRIPTS==========================================-->>
+  <script>
+    window.addEventListener('load', () => {
+      //--------------------------------------------------------------------------------mapping
+      const mapping = (x, y) => {
+        x2 = x * a11 + y * a12;
+        y2 = x * a21 + y * a22;
+        return { "x": x2, "y": y2 }
+      }
+      //--------------------------------------------------------------------------------buildInvP
+      const buildInvP=()=>{
+        d=v1x*v2y-v1y*v2x;
+        if(d==0){
+          return -1;
+        }
+        inv1x=v2y/d;
+        inv2y=v1x/d;
+        inv1y=-v1y/d;
+        inv2x=-v2x/d;
+        return 1;
+      }
+      //--------------------------------------------------------------------------------convInvP
+        const convInvP = (x, y) => {
+        x2 = x * inv1x + y * inv2x;
+        y2 = x * inv1y + y * inv2y;
+        return { "x": x2, "y": y2 }
+      }
+
+      //--------------------------------------------------------------------------------updateA
+      const updateA = () => {
+        a11 = A11.value;
+        a12 = A12.value;
+        a21 = A21.value;
+        a22 = A22.value;
+      }
+      //--------------------------------------------------------------------------------drawLineAsAxis
+      const drawLineAsAxis = (ctx, fromx, fromy, tox, toy) => {
+        cfrom = axisToGio(fromx, fromy);
+        cto = axisToGio(tox, toy);
+        ctx.beginPath();
+        ctx.moveTo(cfrom.x, cfrom.y);
+        ctx.lineTo(cto.x, cto.y);
+        ctx.stroke();
+        ctx.closePath();
+      }
+      //--------------------------------------------------------------------------------drawScaleAsAxis
+      const drawScaleAsAxis = (ctx, x, y, n) => {
+        res = axisToGio(x, y);
+        ctx.fillText('' + n, res.x , res.y);
+      }
+
+      //--------------------------------------------------------------------------------eigenaxis
+      const eigenaxis = (ctx, scale) => {
+        let fromx, fromy;
+        let tox, toy;
+        let ori = { "x": 0, "y": 0 }
+        border = 20;
+        orig_axis.clearRect(0, 0, orig_axis_c.width, orig_axis_c.height);
+        orig_axis.beginPath();
+        orig_axis.strokeRect(0, 0, orig_axis_c.width, orig_axis_c.height);
+        orig_axis.closePath();
+        i=0;
+        for (ori.x = 0, ori.y = 0; ; ori.x += v2x, ori.y += v2y) {
+          if (((ori.x > border) || (ori.x < -border)) || (ori.y > border) || (ori.y < -border)) {
+            break;
+          }
+          //Find Borders
+          tox = ori.x + v1x * 20;
+          toy = ori.y + v1y * 20;
+          fromx = ori.x - v1x * 20;
+          fromy = ori.y - v1y * 20;
+          drawLineAsAxis(orig_axis, fromx, fromy, tox, toy);
+          drawScaleAsAxis(orig_axis,ori.x,ori.y,i++);
+        }
+        i=-1
+        for (ori.x = -v2x , ori.y = -v2y ; ; ori.x -= v2x, ori.y -= v2y) {
+          if (((ori.x > border) || (ori.x < -border)) || (ori.y > border) || (ori.y < -border)) {
+            break;
+          }
+          //Find Borders
+          tox = ori.x + v1x * 20;
+          toy = ori.y + v1y * 20;
+          fromx = ori.x - v1x * 20;
+          fromy = ori.y - v1y * 20;
+          drawLineAsAxis(orig_axis, fromx, fromy, tox, toy);
+          drawScaleAsAxis(orig_axis,ori.x,ori.y,i--);
+        }
+        i=0;
+        for (ori.x = 0, ori.y = 0; ; ori.x += v1x, ori.y += v1y) {
+          if (((ori.x > border) || (ori.x < -border)) || (ori.y > border) || (ori.y < -border)) {
+            break;
+          }
+          tox = ori.x + v2x * 20;
+          toy = ori.y + v2y * 20;
+          fromx = ori.x - v2x * 20;
+          fromy = ori.y - v2y * 20;
+          drawLineAsAxis(orig_axis, fromx, fromy, tox, toy);
+          drawScaleAsAxis(orig_axis,ori.x,ori.y,i++);
+        }
+        i=-1;
+        for (ori.x = -v1x, ori.y = -v1y; ; ori.x -= v1x, ori.y -= v1y) {
+          if (((ori.x > border) || (ori.x < -border)) || (ori.y > border) || (ori.y < -border)) {
+            break;
+          }
+          tox = ori.x + v2x * 20;
+          toy = ori.y + v2y * 20;
+          fromx = ori.x - v2x * 20;
+          fromy = ori.y - v2y * 20;
+          drawLineAsAxis(orig_axis, fromx, fromy, tox, toy);
+          drawScaleAsAxis(orig_axis,ori.x,ori.y,i--);
+        }
+        imageData = orig_axis.getImageData(0, 0, orig_image_c.width, orig_image_c.height);
+        mapped_axis.putImageData(imageData, 0, 0);
+      }
+      //--------------------------------------------------------------------------------eigenvactor
+      const eigenvactor = (l) => {
+        if (a12 == 0 && a22 == l) {
+          return { "x": 0, "y": 1 }
+        }
+        if (a12 != 0) {
+          x = 1;
+          y = (l - a11) / a12;
+        } else {//if(a22!=l){
+          x = 1;
+          y = a21 / (l - a22);
+        }
+        z = Math.sqrt(x * x + y * y);
+        y = y / z;
+        x = x / z;
+        return { "x": x, "y": y }
+      }
+      //--------------------------------------------------------------------------------eigenvalue
+      const eigenvalue = () => {
+        //charcteristic function
+        b = -a11 - a22;
+        c = a11 * a22 - a12 * a21;
+        d = b * b - 4 * c;
+        if (d < 0) {
+          return -1;
+        }
+        l1 = (-b - Math.sqrt(d)) / 2.0;
+        l2 = (-b + Math.sqrt(d)) / 2.0;
+        return 0;
+      }
+      //--------------------------------------------------------------------------------eigen
+      const eigen = () => {
+        if (eigenvalue() == -1) {
+          memo.innerHTML = "No eigen value"
+          eigencheck.checked = false;
+          return;
+        }
+        if (a12 == 0 && a21 == 0) {
+          eigencheck.checked = false;
+          if (a11 == a22) {//Unit
+            memo.innerHTML = "Degenerated L=" + l1.toFixed(2) + " Every vector is eigen"
+          }else{//Diag
+            v1x=1;v1y=0;
+            v2x=0;v2y=1;
+            memo.innerHTML = "No conversion, L1="+l1.toFixed(2) + "(" + v1x.toFixed(2) + "," + v1y.toFixed(2) + ")" + " L2=" + l2.toFixed(2) + "(" + v2x.toFixed(2) + "," + v2y.toFixed(2) + ")";
+          }
+          return;
+        }
+        res = eigenvactor(l1);
+        v1x = res.x; v1y = res.y;
+        res = eigenvactor(l2);
+        v2x = res.x; v2y = res.y;
+        if (l1 == l2) {
+          memo.innerHTML = "Degenerated L=" + l1.toFixed(2) + "(" + v1x.toFixed(2) + "," + v1y.toFixed(2) + ")"
+          eigencheck.checked = false;
+          return;
+        }
+        memo.innerHTML = "L1=" + l1.toFixed(2) + "(" + v1x.toFixed(2) + "," + v1y.toFixed(2) + ")" + " L2=" + l2.toFixed(2) + "(" + v2x.toFixed(2) + "," + v2y.toFixed(2) + ")";
+        if(buildInvP()==-1){
+          return;
+        }
+        eigenaxis();
+        eigenmode=1;
+      }
+      //--------------------------------------------------------------------------------dragEnd
+      const dragEnd = (event) => {
+        orig_temp.closePath();
+        mapped_temp.closePath();
+        if (isDrag == 0) {
+          return;
+        }
+        isDrag = 0;
+        if (ptype == "1" || ptype == "2") { //line or rect
+          drawLineRect(event.layerX, event.layerY);
+        }
+        lastPosition.m_x = null;
+        lastPosition.m_y = null;
+        lastPosition.c_x = null;
+        lastPosition.c_y = null;
+      }
+      //--------------------------------------------------------------------------------dragStart
+      const dragStart = (e) => {
+        const imageData = orig_image.getImageData(0, 0, orig_image_c.width, orig_image_c.height);
+        undoList.push(() => {
+          orig_image.putImageData(imageData, 0, 0);
+        });
+        const imageData2 = mapped_image.getImageData(0, 0, mapped_image_c.width, mapped_image_c.height);
+        undoList2.push(() => {
+          mapped_image.putImageData(imageData2, 0, 0);
+        });
+
+        let elements = document.getElementsByName('pentype');
+        for (let i = 0; i < elements.length; i++) {
+          if (elements.item(i).checked) {
+            ptype = elements.item(i).value;
+            break;
+          }
+        }
+        startX = e.offsetX;
+        startY = e.offsetY;
+        res = mappingOnGio(startX, startY);
+        startCX = res.x;
+        startCY = res.y;
+        orig_image.beginPath();
+        mapped_image.beginPath();
+        if(ptype=="3"){//Dot
+          orig_image.arc(startX,startY, 3, 0, Math.PI * 2, false);
+          orig_image.stroke();
+          orig_image.closePath();
+          mapped_image.arc(startCX,startCY, 3, 0, Math.PI * 2, false);
+          mapped_image.stroke();
+          mapped_image.closePath();
+          return;
+        }
+        if(ptype=="4"){//Line from origi
+          origin=axisToGio(0,0);
+          orig_image.moveTo(origin.x, origin.y);
+          orig_image.lineTo(startX,startY);
+          orig_image.stroke();
+          orig_image.closePath();
+          mapped_image.moveTo(origin.x, origin.y);
+          mapped_image.lineTo(startCX,startCY);
+          mapped_image.stroke();
+          mapped_image.closePath();
+          return;
+        }
+        isDrag = 1;
+      }
+      //--------------------------------------------------------------------------------drawAxis
+      const drawAxis = () => {
+        ctx = orig_axis;
+        cvs = ctx.canvas;
+        color = ctx.strokeStyle;
+        for (x = 0; x <= cvs.width; x += 50) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, cvs.height);
+          ctx.stroke();
+          ctx.closePath();
+          ctx.fillText('' + (x - cvs.width / 2) / 50, x + 3, cvs.height / 2);
+        }
+        for (y = 0; y <= cvs.height; y += 50) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(cvs.width, y);
+          ctx.stroke();
+          ctx.closePath();
+          ctx.fillText('' + (cvs.width / 2 - y) / 50, cvs.width / 2 + 3, y);
+        }
+        imageData = orig_axis.getImageData(0, 0, orig_image_c.width, orig_image_c.height);
+        mapped_axis.putImageData(imageData, 0, 0);
+      }
+      //--------------------------------------------------------------------------------clear
+      const clear = () => {
+        orig_image.clearRect(0, 0, orig_image_c.width, orig_image_c.height);
+        orig_axis.clearRect(0, 0, orig_axis_c.width, orig_axis_c.height);
+        orig_temp.clearRect(0, 0, orig_temp_c.width, orig_temp_c.height);
+        mapped_image.clearRect(0, 0, orig_image_c.width, orig_image_c.height);
+        mapped_axis.clearRect(0, 0, mapped_axis_c.width, mapped_axis_c.height);
+        mapped_temp.clearRect(0, 0, mapped_temp_c.width, mapped_temp_c.height);
+
+        orig_image.strokeStyle = colorpicker.value;
+        drawAxis();
+        updateA();
+        undoList.length = 0;
+        undoList2.length = 0;
+        memo.innerHTML = "";
+        eigencheck.checked = false;
+        eigenmode=0;
+      }
+      //--------------------------------------------------------------------------------gioToAxis
+      const gioToAxis = (x, y) => {
+        Xscale = orig_image_c.width / 2;
+        Yscale = orig_image_c.height / 2;
+        return { "x": (x - Xscale) / Xscale * 4, "y": (Yscale - y) / Yscale * 4 }
+      }
+      const axisToGio = function (x, y) {
+        Xscale = orig_image_c.width / 2;
+        Yscale = orig_image_c.height / 2;
+        x = x * Xscale / 4.0;
+        y = y * Yscale / 4.0;
+        return { "x": x + Xscale, "y": Yscale - y }
+      }
+
+      //draw
+      //--------------------------------------------------------------------------------drawTrapezoid
+      const drawTrapezoid = (targateCtx, xA, yA, xB, yB, xC, yC, xD, yD) => {
+        mappedCtx.beginPath();
+        targateCtx.moveTo(xA, yA);
+        targateCtx.lineTo(xB, yB);
+        targateCtx.lineTo(xD, yD);
+        targateCtx.lineTo(xC, yC);
+        targateCtx.lineTo(xA, yA);
+        mappedCtx.stroke();
+        mappedCtx.closePath();
+      }
+      //--------------------------------------------------------------------------------mappingOnGio
+      const mappingOnGio = (x, y) => {
+        res = gioToAxis(x, y);
+        let x1 = res.x;
+        let y1 = res.y;
+        res = mapping(x1, y1);
+        let x2 = res.x;
+        let y2 = res.y;
+        res = axisToGio(x2, y2)
+        return { "x": res.x, "y": res.y };
+      }
+
+      //--------------------------------------------------------------------------------drawLineRect
+      const drawLineRect = (m_x, m_y) => {
+        orig_temp.clearRect(0, 0, orig_temp_c.width, orig_temp_c.height);
+        mapped_temp.clearRect(0, 0, mapped_temp_c.width, mapped_temp_c.height);
+        let s;
+        if (isDrag == 1) {
+          // hold
+          targateCtx = orig_temp;
+          mappedCtx = mapped_temp;
+        } else {
+          targateCtx = orig_image;
+          mappedCtx = mapped_image;
+        }
+        if (ptype == "1") {
+          targateCtx.beginPath();
+          targateCtx.moveTo(startX, startY);
+          targateCtx.lineTo(m_x, m_y);
+          targateCtx.stroke();
+          targateCtx.closePath();
+        } else if (ptype == "2") {
+          targateCtx.beginPath();
+          targateCtx.strokeRect(startX, startY, m_x - startX, m_y - startY);
+          targateCtx.closePath();
+        }
+        if (ptype == "1") {
+          res = mappingOnGio(m_x, m_y);
+          mappedCtx.beginPath();
+          mappedCtx.moveTo(startCX, startCY);
+          mappedCtx.lineTo(res.x, res.y);
+          mappedCtx.stroke();
+          mappedCtx.closePath();
+        } else if (ptype == "2") {
+          xA = startCX; yA = startCY;
+          res = mappingOnGio(startX, m_y);
+          xB = res.x; yB = res.y;
+          res = mappingOnGio(m_x, startY);
+          xC = res.x; yC = res.y;
+          res = mappingOnGio(m_x, m_y);
+          xD = res.x; yD = res.y;
+          drawTrapezoid(mappedCtx, xA, yA, xB, yB, xC, yC, xD, yD);
+        }
+      }
+
+      //--------------------------------------------------------------------------------drawPen
+      const draw = (m_x, m_y) => {
+        res = gioToAxis(m_x, m_y);
+        axisPosition.x1 = res.x;
+        axisPosition.y1 = res.y;
+        res = mapping(axisPosition.x1, axisPosition.y1);
+        axisPosition.x2 = res.x;
+        axisPosition.y2 = res.y;
+        res = axisToGio(axisPosition.x2, axisPosition.y2)
+        let c_x = res.x;
+        let c_y = res.y;
+
+        if (lastPosition.m_x === null || lastPosition.m_y === null) {
+          prev_mx = m_x;
+          prev_my = m_y;
+        } else {
+          prev_mx = lastPosition.m_x;
+          prev_my = lastPosition.m_y;
+        }
+        if (lastPosition.c_x === null || lastPosition.c_y === null) {
+          prev_cx = c_x;
+          prev_cy = c_y;
+        } else {
+          prev_cx = lastPosition.c_x;
+          prev_cy = lastPosition.c_y;
+        }
+        orig_image.moveTo(prev_mx, prev_my);
+        orig_image.lineTo(m_x, m_y);
+        orig_image.stroke();
+        mapped_image.moveTo(prev_cx, prev_cy);
+        mapped_image.lineTo(c_x, c_y);
+        mapped_image.stroke();
+        lastPosition.m_x = m_x;
+        lastPosition.m_y = m_y;
+        lastPosition.c_x = c_x;
+        lastPosition.c_y = c_y;
+      }
+      //--------------------------------------------------------------------------------mousemove
+      const mousemove = () => {
+        res = gioToAxis(event.layerX, event.layerY)
+        if(eigenmode==1){
+          resP=convInvP(res.x,res.y);
+          output.innerHTML = "x:" + resP.x.toFixed(2) + " y:" + resP.y.toFixed(2);
+        }else{
+          output.innerHTML = "x:" + res.x.toFixed(2) + " y:" + res.y.toFixed(2);
+        }
+        res2 = mapping(res.x, res.y);
+        if(eigenmode==1){
+          resP=convInvP(res2.x,res2.y);
+          output2.innerHTML = "x:" + resP.x.toFixed(2) + " y:" + resP.y.toFixed(2);
+        }else{
+          output2.innerHTML = "x:" + res2.x.toFixed(2) + " y:" + res2.y.toFixed(2);
+        }
+        if (isDrag == 0) {
+          return;
+        }
+        //position check
+        if (ptype == "0") { //Pen 
+          draw(event.layerX, event.layerY);
+        } else if (ptype == "1" || ptype == "2") { //Line or Rect
+          drawLineRect(event.layerX, event.layerY);
+        }
+
+      }
+      //--------------------------------------------------------------------------------initEventHandler
+      const initEventHandler = () => {
+        document.querySelector('#clear-button').addEventListener('click', clear);
+        orig_image_c.addEventListener('mousedown', dragStart);
+        orig_image_c.addEventListener('mouseup', dragEnd);
+        orig_image_c.addEventListener('mouseout', dragEnd);
+        orig_image_c.addEventListener('mousemove', mousemove);
+        document.querySelector("#undo").addEventListener("click", () => {
+          if (undoList.length > 0) {
+            undoList.pop()();
+            undoList2.pop()();
+          }
+        });
+        colorpicker.addEventListener("change", () => {
+          orig_image.strokeStyle = colorpicker.value;
+          mapped_image.strokeStyle = colorpicker.value;
+        });
+        eigencheck.addEventListener("change", () => {
+          if (eigencheck.checked == true) {
+            eigen();
+          } else {
+            eigenmode=0;
+            orig_axis.clearRect(0, 0, orig_axis_c.width, orig_axis_c.height);
+            drawAxis();
+            memo.innerHTML = "";
+          }
+        });
+        tA11.addEventListener("change", clear);
+        tA12.addEventListener("change", clear);
+        tA21.addEventListener("change", clear);
+        tA22.addEventListener("change", clear);
+      }
+      //===================================================================================== MAIN
+      const undoList = [];
+      const undoList2 = [];
+      let prev_mx;
+      let prev_my;
+      let prev_cx;
+      let prev_cy;
+      let a11, a12, a21, a22;
+      let v1x, v1y, v2x, v2y;
+      let inv1x, inv1y, inv2x, inv2y;
+      let ptype = '';
+      let startX;
+      let startY;
+      let startCX;
+      let startCY;
+      const pensize = 3;
+      const orig_image_c = document.querySelector('#orig-image');
+      const orig_image = orig_image_c.getContext('2d');
+      const orig_temp_c = document.querySelector('#orig-temp');
+      const orig_temp = orig_temp_c.getContext('2d');
+      const orig_axis_c = document.querySelector('#orig-axis');
+      const orig_axis = orig_axis_c.getContext('2d');
+      const mapped_image_c = document.querySelector('#mapped-image');
+      const mapped_image = mapped_image_c.getContext('2d');
+      const mapped_temp_c = document.querySelector('#mapped-temp');
+      const mapped_temp = mapped_temp_c.getContext('2d');
+      const mapped_axis_c = document.querySelector('#mapped-axis');
+      const mapped_axis = mapped_axis_c.getContext('2d');
+
+      const output = document.querySelector('#output');
+      const lastPosition = { m_x: null, m_y: null, c_x: null, c_y: null };
+      const axisPosition = { x1: null, y1: null, x2: null, y2: null };
+      const eigencheck = document.querySelector("#eigen");
+      const colorpicker = document.querySelector("#pencolor")
+      const tA11 = document.querySelector("#A11");
+      const tA12 = document.querySelector("#A12");
+      const tA21 = document.querySelector("#A21");
+      const tA22 = document.querySelector("#A22");
+      let holdClick = 0;
+      let isDrag = 0;
+      let eigenmode = 0;
+      orig_image.lineWidth =mapped_image.lineWidth = pensize;
+      mapped_axis.font=orig_axis.font = "16px 'ＭＳ ゴシック'";
+
+      clear();
+      //start
+      initEventHandler();
+    });
+  </script>
+</body>
+
+</html>
