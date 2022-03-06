@@ -14,7 +14,7 @@ The unit vectors of the oblique coodinates are eigenvectors of the matrix.
 When the oblique coodinates is showned, the cordinate values what you can see
 below each canvas are on the oblique coodinates.
 
-Some problems can be exercised with this HTML sheet.
+Some problems can be exercised with this HTML sheet.  
 Q1) Check how the mapping changes in each of the two matrices with positive and negative determinants.  
 Q2) Check the image of the matrix whose determinant is 0.  
 Q3) Check the image of the diagonal martix.  
