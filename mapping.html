@@ -36,10 +36,10 @@
 
 <body>
   <h1>Matrix</h1>
-  <label>A11：<input type="text" class="txt" id="A11" value=2></label>
-  <label>A11：<input type="text" class="txt" id="A12" value=-1></label><br>
-  <label>A21：<input type="text" class="txt" id="A21" value=-1></label>
-  <label>A22：<input type="text" class="txt" id="A22" value=2></label>
+  <label>A11：<input type="text" class="txt" id="A11" value=1></label>
+  <label>A11：<input type="text" class="txt" id="A12" value=2></label><br>
+  <label>A21：<input type="text" class="txt" id="A21" value=4></label>
+  <label>A22：<input type="text" class="txt" id="A22" value=3></label>
   <input type="checkbox" id="eigen" name="eigen"><label for="eigen">Eigen Values</label>
   <span id="memo" margin="10px" height="1.5em" font-size="12px"></span>
   <hr>
@@ -247,6 +247,7 @@
         }
         eigenaxis();
         eigenmode=1;
+        update_position(cur_x,cur_y);
       }
       //--------------------------------------------------------------------------------dragEnd
       const dragEnd = (event) => {
@@ -314,6 +315,7 @@
         }
         imageData = orig_axis.getImageData(0, 0, orig_axis_c.width, orig_axis_c.height);
         mapped_axis.putImageData(imageData, 0, 0);
+        update_position(cur_x,cur_y);
       }
       //--------------------------------------------------------------------------------clear
       const clear = () => {
@@ -488,32 +490,66 @@
         lastPosition.c_x = c_x;
         lastPosition.c_y = c_y;
       }
-      //--------------------------------------------------------------------------------mousemove
-      const mousemove = () => {
-        res = gioToAxis(event.layerX, event.layerY)
-        if(eigenmode==1){
-          resP=convInvP(res.x,res.y);
-          output.innerHTML = "x:" + resP.x.toFixed(2) + " y:" + resP.y.toFixed(2);
-        }else{
-          output.innerHTML = "x:" + res.x.toFixed(2) + " y:" + res.y.toFixed(2);
-        }
+
+      //--------------------------------------------------------------------------------update pos
+      const update_position= (x,y) => {
+        res = gioToAxis(x, y);
         res2 = mapping(res.x, res.y);
         if(eigenmode==1){
+          resP=convInvP(res.x,res.y);
+          output.innerHTML = "p:" + resP.x.toFixed(2) + " q:" + resP.y.toFixed(2);
           resP=convInvP(res2.x,res2.y);
-          output2.innerHTML = "x:" + resP.x.toFixed(2) + " y:" + resP.y.toFixed(2);
+          output2.innerHTML = "p:" + resP.x.toFixed(2) + " q:" + resP.y.toFixed(2);
         }else{
+          output.innerHTML = "x:" + res.x.toFixed(2) + " y:" + res.y.toFixed(2);
           output2.innerHTML = "x:" + res2.x.toFixed(2) + " y:" + res2.y.toFixed(2);
         }
+      }
+
+      //--------------------------------------------------------------------------------mousemove
+      const mousemove = () => {
+        cur_x=event.layerX;
+        cur_y=event.layerY;
+        update_position(cur_x, cur_y);
         if (isDrag == 0) {
           return;
         }
+
         //position check
         if (ptype == "0") { //Pen 
-          draw(event.layerX, event.layerY);
+          draw(cur_x, cur_y);
         } else { 
-          drawShape(event.layerX, event.layerY);
+          drawShape(cur_x, cur_y);
         }
-
+      }
+      //--------------------------------------------------------------------------------eigenchange
+      const eigenchange=()=>{
+        if (eigencheck.checked == true) {
+            eigen();
+          } else {
+            eigenmode=0;
+            orig_axis.clearRect(0, 0, orig_axis_c.width, orig_axis_c.height);
+            drawAxis();
+            memo.innerHTML = "";
+          }
+      }
+      //--------------------------------------------------------------------------------undo
+      const undo=()=>{
+        if (undoList.length > 0) {
+            undoList.pop()();
+            undoList2.pop()();
+          }
+      }
+      //--------------------------------------------------------------------------------keydown
+      const keydown=(e)=>{
+          if(e.key==='e' || e.key==='E'){
+            eigencheck.checked = !eigencheck.checked;
+            eigenchange();
+          }else if(e.key==='c' || e.key==='C'){
+            clear();
+          }else if(e.key==='u' || e.key==='U'){
+            undo();
+          }
       }
       //--------------------------------------------------------------------------------initEventHandler
       const initEventHandler = () => {
@@ -522,30 +558,17 @@
         orig_image_c.addEventListener('mouseup', dragEnd);
         orig_image_c.addEventListener('mouseout', dragEnd);
         orig_image_c.addEventListener('mousemove', mousemove);
-        document.querySelector("#undo").addEventListener("click", () => {
-          if (undoList.length > 0) {
-            undoList.pop()();
-            undoList2.pop()();
-          }
-        });
+        document.querySelector("#undo").addEventListener("click", undo);
         colorpicker.addEventListener("change", () => {
           orig_image.strokeStyle = colorpicker.value;
           mapped_image.strokeStyle = colorpicker.value;
         });
-        eigencheck.addEventListener("change", () => {
-          if (eigencheck.checked == true) {
-            eigen();
-          } else {
-            eigenmode=0;
-            orig_axis.clearRect(0, 0, orig_axis_c.width, orig_axis_c.height);
-            drawAxis();
-            memo.innerHTML = "";
-          }
-        });
+        eigencheck.addEventListener("change", eigenchange);
         tA11.addEventListener("change", clear);
         tA12.addEventListener("change", clear);
         tA21.addEventListener("change", clear);
         tA22.addEventListener("change", clear);
+        document.addEventListener('keydown',keydown);
       }
       //===================================================================================== MAIN
       const undoList = [];
@@ -562,6 +585,7 @@
       let startY;
       let startCX;
       let startCY;
+      let cur_x,cur_y;
       const pensize = 3;
       const orig_image_c = document.querySelector('#orig-image');
       const orig_image = orig_image_c.getContext('2d');
