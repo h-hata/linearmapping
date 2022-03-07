@@ -1,5 +1,5 @@
-# liner mapping
-This is a HTML with some script for learning liner mapping.
+# linear mapping
+This is a HTML with some script for learning linear mapping.
 
 # usage
 Two canvases apear on your browser when this HTML file is loaded.
